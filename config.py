@@ -1,5 +1,5 @@
 import os
-
+print("Claude API Key desde config.py:", os.environ.get("CLAUDE_API_KEY", "NO ENCONTRADA"))
 # Obtener claves desde variables de entorno
 CLAUDE_API_KEY = os.environ.get("CLAUDE_API_KEY", "CLAVE_NO_ENCONTRADA")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "CLAVE_NO_ENCONTRADA")
@@ -12,7 +12,7 @@ APIS_DISPONIBLES = {
         "nombre": "Claude (Anthropic)",
         "clave": CLAUDE_API_KEY,
         "url": "https://api.anthropic.com/v1/complete",
-        "modelo": "claude-3-opus-2024-02-29"
+        "modelo": "claude-3-7-sonnet-20250219"
     },
     "Gemini": {
         "nombre": "Gemini (Google)",
@@ -33,7 +33,7 @@ def consulta_claude(mensaje):
             "Content-Type": "application/json"
         }
         data = {
-            "model": "claude-3-opus-2024-02-29",
+            "model": "claude-3-7-sonnet-20250219",
             "prompt": mensaje,
             "max_tokens": 300
         }

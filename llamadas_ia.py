@@ -1,27 +1,42 @@
+# -*- coding: utf-8 -*-
+import os
 import requests
 import json
-from config import CLAUDE_API_KEY
+from config import CLAUDE_API_KEY  # AsegÃºrate de que estÃ¡ importado correctamente
 
-print("Usando API Key:", CLAUDE_API_KEY)
+# Verificar si la API key estÃ¡ definida correctamente
+if not CLAUDE_API_KEY or CLAUDE_API_KEY == "CLAVE_NO_ENCONTRADA":
+    print("âš ï¸ ERROR: La clave de API de Claude no estÃ¡ configurada correctamente.")
+else:
+    print(f"âœ… Claude API Key detectada: {CLAUDE_API_KEY[:10]}********")
 
-# Función para hacer la llamada a la API de Claude
+# FunciÃ³n para hacer la llamada a la API de Claude
 def consulta_claude(mensaje):
-    url = "https://api.anthropic.com/v1/complete"
+    url = "https://api.anthropic.com/v1/messages"  # URL de la API
     headers = {
-        "Authorization": f"Bearer {CLAUDE_API_KEY}",
-        "Content-Type": "application/json"
+        "x-api-key": CLAUDE_API_KEY,
+        "Content-Type": "application/json",
+        "anthropic-version": "2023-06-01"
     }
 
     data = {
-        "model": "claude-3-opus-2024-02-29",
-        "prompt": mensaje,
-        "max_tokens": 300
+        "model": "claude-3-7-sonnet-20250219",  # Modelo correcto
+        "max_tokens": 300,
+        "messages": [{"role": "user", "content": mensaje}]
     }
 
-    response = requests.post(url, headers=headers, json=data)
+    try:
+        response = requests.post(url, headers=headers, json=data)
+        response_json = response.json()
 
-    if response.status_code == 200:
-        return response.json().get("completion", "⚠️ No se recibió respuesta.")
-    else:
-        return f"⚠️ Error en la consulta: {response.text}"
+        if response.status_code == 200:
+            contenido = response_json.get("content")
+            if contenido:
+                return contenido
+            else:
+                return "âš ï¸ La API no devolviÃ³ contenido en la respuesta."
+        else:
+            return f"âŒ Error en la consulta: {response_json.get('error', 'Error desconocido')}"
 
+    except requests.exceptions.RequestException as e:
+        return f"ðŸš¨ Error en la conexiÃ³n con la API: {str(e)}"

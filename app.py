@@ -1,8 +1,9 @@
+import os
 import streamlit as st
 from supabase_client import buscar_expediente_completo
 from llamadas_ia import consulta_claude
 from config import APIS_DISPONIBLES, obtener_api
-
+print("Usando API Key en app.py:", os.environ.get("CLAUDE_API_KEY", "NO ENCONTRADA"))
 # Configuración de la página
 st.set_page_config(page_title="IA - Gestión de Expedientes", layout="wide")
 
