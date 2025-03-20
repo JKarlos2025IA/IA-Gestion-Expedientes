@@ -3,6 +3,7 @@ import streamlit as st
 from supabase_client import buscar_expediente_completo
 from llamadas_ia import consulta_claude
 from config import APIS_DISPONIBLES, obtener_api
+
 print("Usando API Key en app.py:", os.environ.get("CLAUDE_API_KEY", "NO ENCONTRADA"))
 # Configuración de la página
 st.set_page_config(page_title="IA - Gestión de Expedientes", layout="wide")
@@ -32,23 +33,59 @@ def mostrar_busqueda_expedientes():
         else:
             st.error("No se encontró el expediente.")
 
+# Inicializar historial de chat en la sesión si no existe
+if 'mensajes' not in st.session_state:
+    st.session_state.mensajes = []
+
 # Sección de Chat con IA
 def mostrar_chat():
-    st.title("Chat con IA")
-    consulta = st.text_area("Escribe tu pregunta sobre los expedientes:")
-
-    if st.button("Consultar"):
-        api_seleccionada = obtener_api(opcion_ia)
-
-        if api_seleccionada:
-            if opcion_ia == "Claude":
-                respuesta = consulta_claude(consulta)
-            else:
-                respuesta = "⚠️ Modelo no reconocido o aún no implementado."
+    st.title("Chat con IA sobre Expedientes")
+    
+    # Mostrar historial de mensajes
+    for mensaje in st.session_state.mensajes:
+        if mensaje["role"] == "user":
+            st.markdown(f"**Tú:** {mensaje['content']}")
         else:
-            respuesta = "⚠️ No se ha configurado correctamente la API seleccionada."
+            st.markdown(f"**Asistente:** {mensaje['content']}")
+    
+    # Campo de entrada para nueva consulta
+    consulta = st.text_area("Escribe tu pregunta sobre los expedientes:", 
+                           placeholder="Ejemplo: Búscame expedientes relacionados con contrataciones de la Dirección de Evaluación...")
 
-        st.write("Respuesta de la IA:", respuesta)
+    # Crear dos columnas para los botones
+    col1, col2 = st.columns([1, 5])
+    
+    with col1:
+        if st.button("Enviar", use_container_width=True):
+            if consulta.strip() == "":
+                st.warning("Por favor, escribe una consulta.")
+                return
+            
+            # Agregar consulta del usuario al historial
+            st.session_state.mensajes.append({"role": "user", "content": consulta})
+            
+            # Mostrar indicador de carga
+            with st.spinner("Buscando información y generando respuesta..."):
+                api_seleccionada = obtener_api(opcion_ia)
+
+                if api_seleccionada:
+                    if opcion_ia == "Claude":
+                        respuesta = consulta_claude(consulta)
+                    else:
+                        respuesta = "⚠️ Modelo no reconocido o aún no implementado."
+                else:
+                    respuesta = "⚠️ No se ha configurado correctamente la API seleccionada."
+                
+                # Agregar respuesta al historial
+                st.session_state.mensajes.append({"role": "assistant", "content": respuesta})
+                
+                # Recargar la página para mostrar los nuevos mensajes
+                st.rerun()
+    
+    with col2:
+        if st.button("Limpiar Chat", use_container_width=True):
+            st.session_state.mensajes = []
+            st.rerun()
 
 # Sección para subir PDF
 def subir_pdf():
