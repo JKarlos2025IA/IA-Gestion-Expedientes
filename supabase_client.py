@@ -1,40 +1,40 @@
 # -*- coding: utf-8 -*-
+import os
 from supabase import create_client
 
-# Configuración de Supabase
+# ConfiguraciÃ³n de Supabase
 SUPABASE_URL = "https://qjpcfuyzhrnqcjxnyxcf.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFqcGNmdXl6aHJucWNqeG55eGNmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzkwNzUzODQsImV4cCI6MjA1NDY1MTM4NH0.vASDpURRLt5wf9ngGkCNkiT0c-XbillDLTW9KFqk9Tg"
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-def buscar_en_toda_bd(consulta):
-    """
-    Busca una palabra clave o frase en todas las tablas relevantes de la base de datos.
-    """
+# Función para buscar un expediente con documentos relacionados
+def buscar_expediente_completo(numero_expediente):
     try:
-        # Buscar en la tabla de expedientes
-        expedientes_res = supabase.table("expedientes").select("*").ilike("numero_expediente", f"%{consulta}%").execute()
+        # Buscar el expediente
+        expediente_res = (
+            supabase.table("expedientes")
+            .select("*")
+            .eq("numero_expediente", numero_expediente)
+            .execute()
+        )
 
-        expediente_id = None  # Inicializar expediente_id
+        # Buscar los documentos relacionados al expediente
+        documentos_res = (
+            supabase.table("documentos_expediente")
+            .select("*")
+            .eq("expediente_id", expediente_res.data[0]["id"])
+            .execute()
+        ) if expediente_res.data else None
 
-        if expedientes_res.data and len(expedientes_res.data) > 0:
-            expediente_id = expedientes_res.data[0]["id"]  # Extraer el ID del primer expediente encontrado
-
-        # Buscar en la tabla de documentos solo si hay un expediente relacionado
-        if expediente_id:
-            documentos_res = supabase.table("documentos_expediente").select("*").eq("expediente_id", expediente_id).execute()
-            documentos = documentos_res.data if documentos_res.data else "No encontrado"
+        # Si se encontró el expediente, devolver la información
+        if expediente_res.data:
+            return {
+                "expediente": expediente_res.data[0],
+                "documentos": documentos_res.data if documentos_res else "No hay documentos"
+            }
         else:
-            documentos = "No encontrado"
-
-        # Formatear la respuesta final
-        resultados = {
-            "expedientes": expedientes_res.data if expedientes_res.data else "No encontrado",
-            "documentos": documentos,
-        }
-
-        print("📌 Resultado antes de devolver:", resultados)  # Para depuración
-        return resultados
+            return None
 
     except Exception as e:
-        print(f"Error al buscar en la base de datos: {e}")
+        print(f"Error al buscar expediente: {e}")
         return None
