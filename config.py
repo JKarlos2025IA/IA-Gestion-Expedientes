@@ -1,19 +1,23 @@
+"""
+Configuración centralizada para el asistente legal
+"""
 import os
-import requests
-print("Claude API Key desde config.py:", os.environ.get("CLAUDE_API_KEY", "NO ENCONTRADA"))
-# Obtener claves desde variables de entorno
-CLAUDE_API_KEY = os.environ.get("CLAUDE_API_KEY", "CLAVE_NO_ENCONTRADA")
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "CLAVE_NO_ENCONTRADA")
-print("Claude API Key:", os.getenv("CLAUDE_API_KEY"))
-print("Gemini API Key:", os.getenv("GEMINI_API_KEY"))
 
-# Configurar las claves de API
+# API Keys para servicios de IA
+CLAUDE_API_KEY = "sk-3719433fa2774b82a1c89e78575a9248"  # Clave Deepseek como alternativa
+GEMINI_API_KEY = "AIzaSyABbkPcr3wTbQbmjQa3Jp7xQXkfSFg3LPI"
+
+# Almacenar las API keys como variables de entorno para mayor seguridad
+os.environ["CLAUDE_API_KEY"] = CLAUDE_API_KEY
+os.environ["GEMINI_API_KEY"] = GEMINI_API_KEY
+
+# Configurar las APIs disponibles
 APIS_DISPONIBLES = {
     "Claude": {
-        "nombre": "Claude (Anthropic)",
+        "nombre": "Deepseek (Alternativa)",
         "clave": CLAUDE_API_KEY,
-        "url": "https://api.anthropic.com/v1/messages",
-        "modelo": "claude-3-7-sonnet-20250219"
+        "url": "https://api.deepseek.com/v1/chat/completions",  # Ajustar URL a Deepseek
+        "modelo": "deepseek-chat"  # Ajustar modelo a Deepseek
     },
     "Gemini": {
         "nombre": "Gemini (Google)",
@@ -22,37 +26,8 @@ APIS_DISPONIBLES = {
         "modelo": "gemini-pro"
     }
 }
+
 # Función para obtener la API seleccionada
 def obtener_api(nombre_api):
+    """Obtiene la configuración de una API por su nombre"""
     return APIS_DISPONIBLES.get(nombre_api, None)
-
-def consulta_claude(mensaje):
-    # Esta función está ahora en llamadas_ia.py
-    # La dejamos aquí para compatibilidad, pero llamamos a la implementación en llamadas_ia.py
-    try:
-        from llamadas_ia import consulta_claude as llamada_claude
-        return llamada_claude(mensaje)
-    except ImportError:
-        # Implementación de respaldo (no debería usarse)
-        try:
-            url = "https://api.anthropic.com/v1/messages"
-            headers = {
-                "anthropic-version": "2023-06-01",
-                "x-api-key": CLAUDE_API_KEY,
-                "content-type": "application/json"
-            }
-            data = {
-                "model": "claude-3-7-sonnet-20250219",
-                "max_tokens": 1000,
-                "messages": [{"role": "user", "content": mensaje}]
-            }
-            response = requests.post(url, headers=headers, json=data)
-            if response.status_code == 200:
-                for item in response.json().get("content", []):
-                    if item.get("type") == "text":
-                        return item.get("text", "")
-                return "⚠️ No se recibió respuesta."
-            else:
-                return f"⚠️ Error en la consulta: {response.text}"
-        except Exception as e:
-            return f"⚠️ Error inesperado: {str(e)}"
