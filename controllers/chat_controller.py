@@ -50,6 +50,35 @@ class ChatController:
         print(f"Números de expediente encontrados: {expedientes}")
         return expedientes
     
+    def detect_query_intent(self, query: str) -> str:
+        """
+        Detecta la intención de la consulta para ajustar el formato de respuesta
+        :param query: Texto de la consulta
+        :return: 'simple', 'search', o 'report'
+        """
+        # Palabras indicadoras de intención
+        simple_indicators = ["existe", "hay", "encuentra", "ubicar", "buscar", "hallar", "contiene"]
+        search_indicators = ["busca", "encuentra", "dame", "muestra", "lista", "relacionados", "similares"]
+        report_indicators = ["analiza", "informe", "reporte", "análisis", "resumen", "detalla", "explica", "evalúa"]
+        
+        query_lower = query.lower()
+        
+        # Verificar si es una consulta sobre existencia de expediente específico
+        expediente_numbers = self.extract_expediente_numbers(query)
+        if expediente_numbers and any(indicator in query_lower for indicator in simple_indicators):
+            return "simple"
+        
+        # Verificar por palabras indicadoras de búsqueda
+        if any(indicator in query_lower for indicator in search_indicators):
+            return "search"
+        
+        # Verificar por palabras indicadoras de informe
+        if any(indicator in query_lower for indicator in report_indicators):
+            return "report"
+        
+        # Por defecto, asumimos que es una búsqueda general
+        return "search"
+    
     def create_conversation(self, title: Optional[str] = None, project_id: Optional[str] = None) -> Optional[str]:
         """Crea una nueva conversación y devuelve su ID"""
         try:
@@ -116,37 +145,42 @@ class ChatController:
             if user_message:
                 message_id = user_message.get("id")
             
-            # 3. Extraer palabras clave y buscar información relevante
+            # 3. Detectar la intención de la consulta
+            intent = self.detect_query_intent(query)
+            
+            # 4. Extraer palabras clave y buscar información relevante
             keywords = self.extract_keywords(query)
             expediente_numbers = self.extract_expediente_numbers(query)
             
             print(f"Buscando información con {len(keywords)} palabras clave y {len(expediente_numbers)} números de expediente")
             relevant_info = self.busqueda_controller.search(keywords, expediente_numbers)
             
-            # 4. Obtener los mensajes recientes para el contexto
+            # 5. Obtener los mensajes recientes para el contexto
             context_messages = self.chat_history.get_message_history_for_context(conv_id, self.max_context_messages)
             
-            # 5. Preparar el mensaje del sistema con el contexto de la información encontrada
-            system_prompt = self._create_system_prompt(relevant_info)
+            # 6. Preparar el mensaje del sistema con el contexto adaptado a la intención
+            system_prompt = self._create_system_prompt(relevant_info, intent)
             
-            # 6. Llamar a la API de IA con el contexto y la consulta
+            # 7. Llamar a la API de IA con el contexto y la consulta
             print(f"Llamando a la API de IA con {len(context_messages)} mensajes de contexto")
             ia_response = self.ia_controller.call_api(context_messages, system_prompt)
             
-            # 7. Guardar la respuesta en el historial
+            # 8. Guardar la respuesta en el historial
             assistant_message = None
             if ia_response:
                 assistant_message = self.chat_history.add_message(conv_id, "assistant", ia_response, {
                     "info_found": bool(relevant_info),
                     "keywords": keywords,
-                    "expedientes": expediente_numbers
+                    "expedientes": expediente_numbers,
+                    "intent": intent
                 })
             
-            # 8. Devolver la respuesta con metadatos
+            # 9. Devolver la respuesta con metadatos
             return {
                 "response": ia_response,
                 "conversation_id": conv_id,
                 "info_found": bool(relevant_info),
+                "intent": intent,
                 "message_id": assistant_message.get("id") if assistant_message else None
             }
         except Exception as e:
@@ -154,22 +188,61 @@ class ChatController:
             print(traceback.format_exc())
             return {"error": f"Error al procesar la consulta: {str(e)}"}
     
-    def _create_system_prompt(self, relevant_info: Dict[str, Any]) -> str:
-        """Crea un prompt del sistema con la información relevante encontrada"""
-        prompt = """Eres un asistente jurídico especializado en gestión de expedientes. Responde de manera profesional y detallada a la consulta utilizando la información de la base de datos proporcionada.
+    def _create_system_prompt(self, relevant_info: Dict[str, Any], intent: str = "search") -> str:
+        """
+        Crea un prompt del sistema con la información relevante encontrada
+        adaptado a la intención detectada en la consulta
+        :param relevant_info: Información relevante encontrada
+        :param intent: Intención detectada ('simple', 'search' o 'report')
+        :return: Prompt del sistema
+        """
+        # Base común para todos los tipos de intención
+        base_prompt = """Eres un asistente jurídico especializado en gestión de expedientes."""
+        
+        # Diferentes instrucciones según la intención
+        if intent == "simple":
+            # Para consultas simples (existencia de expedientes, preguntas directas)
+            prompt = f"""{base_prompt}
+            
+Responde de manera breve y directa a la consulta. Si la pregunta es sobre la existencia de un expediente específico, 
+simplemente indica si existe o no y proporciona los datos básicos sin elaborar demasiado.
 
 Instrucciones:
-1. Responde directamente a la consulta basándote en la información proporcionada.
-2. Si la información es insuficiente, indica qué datos adicionales serían necesarios.
-3. Organiza tu respuesta de manera clara y estructurada, con introducción, desarrollo y conclusión.
-4. Cuando sea apropiado, incluye sugerencias o recomendaciones sobre los próximos pasos a seguir.
-5. Utiliza un tono profesional pero accesible, como lo haría un asesor jurídico experimentado.
+1. Sé conciso. Responde directamente a lo que se pregunta.
+2. Evita largas explicaciones o desarrollo de ideas.
+3. Utiliza frases cortas y directo al punto.
+4. No elabores análisis o interpretaciones a menos que se soliciten explícitamente.
+"""
+        elif intent == "search":
+            # Para búsquedas generales
+            prompt = f"""{base_prompt}
+            
+Responde de manera informativa a la consulta, enfocándote en proporcionar los datos solicitados
+de forma organizada y clara.
+
+Instrucciones:
+1. Presenta los resultados de manera estructurada y fácil de leer.
+2. Organiza la información en listas o puntos cuando sea apropiado.
+3. Destaca los datos clave relevantes a la consulta.
+4. Mantén un equilibrio entre ser conciso y proporcionar suficiente contexto.
+"""
+        else:  # intent == "report"
+            # Para solicitudes de informes detallados
+            prompt = f"""{base_prompt}
+            
+Responde de manera profesional y detallada, generando un informe completo sobre el tema consultado.
+
+Instrucciones:
+1. Estructura tu respuesta con introducción, desarrollo y conclusión.
+2. Proporciona análisis detallado de la información disponible.
+3. Incluye recomendaciones o interpretaciones cuando sea apropiado.
+4. Utiliza un tono formal y profesional propio de un informe jurídico.
+5. Contextualiza la información dentro del marco normativo relevante.
 """
 
-        # Verificar si hay información relevante
+        # Añadir información de expedientes si se encontró
         has_info = False
         
-        # Añadir información de expedientes si se encontró
         if "expedientes" in relevant_info and relevant_info["expedientes"]:
             has_info = True
             prompt += "\n\n## Expedientes encontrados:\n"
@@ -223,7 +296,10 @@ Instrucciones:
         
         # Si no se encontró información, indicarlo
         if not has_info:
-            prompt += "\n\nNo se encontró información específica en la base de datos sobre esta consulta. Por favor responde de manera general basándote en tu conocimiento sobre gestión de expedientes."
+            prompt += "\n\nNo se encontró información específica en la base de datos sobre esta consulta."
+            # Para consultas simples, indicar claramente si no se encuentra un expediente
+            if intent == "simple" and len(self.extract_expediente_numbers(query)) > 0:
+                prompt += " Los expedientes mencionados en la consulta no existen en el sistema."
         
         return prompt
     

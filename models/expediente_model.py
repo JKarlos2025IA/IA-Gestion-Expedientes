@@ -69,17 +69,44 @@ class ExpedienteModel:
         
         return list(unique_results.values())
     
+    # En models/expediente_model.py
     def create(self, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """Crea un nuevo expediente"""
+        """Crea un nuevo expediente con mejor manejo de errores"""
         try:
-            response = self.supabase.table(self.table_name).insert(data).execute()
-            if response.data:
-                return response.data[0]
-            return None
+            # Verificar y limpiar datos
+            cleaned_data = {}
+            for key, value in data.items():
+                if key in ["numero_expediente", "fecha_creacion", "tipo_proceso", 
+                          "modalidad", "seccion", "tema_principal", "area_solicitante", "estado"]:
+                    cleaned_data[key] = str(value) if value is not None else ""
+            
+            # Añadir estado por defecto si no está presente
+            if "estado" not in cleaned_data or not cleaned_data["estado"]:
+                cleaned_data["estado"] = "Activo"
+            
+            print(f"Intentando crear expediente con datos: {cleaned_data}")
+            
+            # Intentar insertar con manejo de errores detallado
+            try:
+                response = self.supabase.table(self.table_name).insert(cleaned_data).execute()
+                
+                if response.data:
+                    print(f"Expediente creado correctamente: {response.data}")
+                    return response.data[0]
+                else:
+                    print(f"No se obtuvo respuesta al crear expediente: {response}")
+                    return None
+            except Exception as insert_error:
+                print(f"Error específico al insertar en Supabase: {insert_error}")
+                if hasattr(insert_error, 'response'):
+                    print(f"Código de respuesta: {insert_error.response.status_code}")
+                    print(f"Texto de respuesta: {insert_error.response.text}")
+                return None
+                
         except Exception as e:
-            print(f"Error al crear expediente: {e}")
+            print(f"Error general al crear expediente: {e}")
             return None
-    
+                                      
     def update(self, expediente_id: int, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Actualiza un expediente existente"""
         try:

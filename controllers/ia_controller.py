@@ -8,7 +8,7 @@ from config import APIS_DISPONIBLES
 
 class IAController:
     def __init__(self, api_name: str = "Claude"):
-        # Variable para depuración - definir primero
+        # Variable para depuraciÃ³n - definir primero
         self.debug_mode = True
         # Ahora configurar la API
         self.set_api(api_name)
@@ -20,12 +20,12 @@ class IAController:
             self.api_name = api_name
             if self.debug_mode:
                 print(f"API configurada: {api_name}")
-                # Mostrar los primeros 5 caracteres de la clave para verificación
+                # Mostrar los primeros 5 caracteres de la clave para verificaciÃ³n
                 api_key = self.api_config.get("clave", "")
                 masked_key = api_key[:5] + "*" * (len(api_key) - 5) if api_key else "No disponible"
                 print(f"API Key: {masked_key}")
             return True
-        print(f"API {api_name} no encontrada en configuración")
+        print(f"API {api_name} no encontrada en configuraciÃ³n")
         return False
     
     def get_available_apis(self) -> List[str]:
@@ -81,7 +81,7 @@ class IAController:
         """
         Llama a la API configurada con los mensajes proporcionados
         :param messages: Lista de mensajes en formato [{role, content}, ...]
-        :param system_prompt: Instrucción del sistema para APIs que lo soporten
+        :param system_prompt: InstrucciÃ³n del sistema para APIs que lo soporten
         :return: Texto de respuesta o mensaje de error
         """
         if self.debug_mode:
@@ -95,7 +95,7 @@ class IAController:
         elif self.api_name == "Gemini":
             return self._call_gemini_api(messages)
         else:
-            return "⚠️ API no implementada o no reconocida."
+            return "âš ï¸ API no implementada o no reconocida."
     
     def _call_claude_api(self, messages: List[Dict[str, str]], system_prompt: Optional[str] = None) -> str:
         """Realiza la llamada a la API de Claude o Deepseek"""
@@ -103,7 +103,7 @@ class IAController:
         api_key = self.api_config["clave"]
         is_deepseek = "deepseek" in self.api_config.get("modelo", "").lower()
         
-        # Headers diferentes según el proveedor
+        # Headers diferentes segÃºn el proveedor
         if is_deepseek:
             headers = {
                 "Content-Type": "application/json",
@@ -133,7 +133,7 @@ class IAController:
                 print(f"Enviando consulta a {self.api_name} con {len(payload_messages)} mensajes...")
                 print(f"URL: {url}")
                 
-                # Ocultar la clave API en la depuración
+                # Ocultar la clave API en la depuraciÃ³n
                 debug_headers = {}
                 for k, v in headers.items():
                     if "key" in k.lower() or "auth" in k.lower():
@@ -150,15 +150,15 @@ class IAController:
                     print(f"Error response: {response.text[:500]}")
             
             if response.status_code != 200:
-                return f"❌ Error en la consulta: {response.status_code} - {response.text[:100]}"
+                return f"âŒ Error en la consulta: {response.status_code} - {response.text[:100]}"
             
             response_json = response.json()
             
-            # Extraer el texto de la respuesta (diferente según el proveedor)
+            # Extraer el texto de la respuesta (diferente segÃºn el proveedor)
             if is_deepseek:
                 if "choices" in response_json and len(response_json["choices"]) > 0:
                     message = response_json["choices"][0].get("message", {})
-                    return message.get("content", "No se recibió contenido en la respuesta.")
+                    return message.get("content", "No se recibiÃ³ contenido en la respuesta.")
             else:
                 # Extraer para Claude
                 if "content" in response_json:
@@ -166,33 +166,52 @@ class IAController:
                         if item.get("type") == "text":
                             return item.get("text", "")
             
-            return "⚠️ No se pudo extraer texto de la respuesta."
+            return "âš ï¸ No se pudo extraer texto de la respuesta."
                 
         except requests.exceptions.RequestException as e:
             if self.debug_mode:
-                print(f"Error de conexión: {str(e)}")
+                print(f"Error de conexiÃ³n: {str(e)}")
                 print(traceback.format_exc())
-            return f"🚨 Error en la conexión con la API: {str(e)}"
+            return f"ðŸš¨ Error en la conexiÃ³n con la API: {str(e)}"
         except Exception as e:
             if self.debug_mode:
                 print(f"Error inesperado: {str(e)}")
                 print(traceback.format_exc())
-            return f"🚨 Error inesperado: {str(e)}"
+            return f"ðŸš¨ Error inesperado: {str(e)}"
     
+# En controllers/ia_controller.py, actualizar el método _call_gemini_api
+
     def _call_gemini_api(self, messages: List[Dict[str, str]]) -> str:
         """Realiza la llamada a la API de Gemini"""
-        base_url = self.api_config["url"]
         api_key = self.api_config["clave"]
         
-        # Agregar la API key como parámetro de consulta
+        # URL actualizada - verificar documentación más reciente
+        base_url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent"
         url = f"{base_url}?key={api_key}"
         
         headers = {
-            "content-type": "application/json"
+            "Content-Type": "application/json"
         }
         
-        data = self._prepare_gemini_payload(messages)
+        # Formato actualizado para Gemini
+        gemini_messages = []
+        for msg in messages:
+            role = "user" if msg["role"] == "user" else "model"
+            gemini_messages.append({
+                "role": role,
+                "parts": [{"text": msg["content"]}]
+            })
         
+        data = {
+            "contents": gemini_messages,
+            "generationConfig": {
+                "temperature": 0.7,
+                "maxOutputTokens": 1024,
+                "topP": 0.95,
+                "topK": 40
+            }
+        }
+       
         try:
             if self.debug_mode:
                 print(f"Enviando consulta a Gemini con {len(messages)} mensajes...")
@@ -206,11 +225,11 @@ class IAController:
                     print(f"Error response: {response.text[:500]}")
             
             if response.status_code != 200:
-                return f"❌ Error en la consulta a Gemini: {response.status_code} - {response.text[:100]}"
+                return f"âŒ Error en la consulta a Gemini: {response.status_code} - {response.text[:100]}"
             
             response_json = response.json()
             
-            # Extraer el texto de la respuesta según el formato de Gemini
+            # Extraer el texto de la respuesta segÃºn el formato de Gemini
             if "candidates" in response_json and len(response_json["candidates"]) > 0:
                 candidate = response_json["candidates"][0]
                 if "content" in candidate and "parts" in candidate["content"]:
@@ -218,15 +237,15 @@ class IAController:
                         if "text" in part:
                             return part["text"]
                 
-            return "⚠️ No se pudo extraer texto de la respuesta de Gemini."
+            return "âš ï¸ No se pudo extraer texto de la respuesta de Gemini."
                 
         except requests.exceptions.RequestException as e:
             if self.debug_mode:
-                print(f"Error de conexión con Gemini: {str(e)}")
+                print(f"Error de conexiÃ³n con Gemini: {str(e)}")
                 print(traceback.format_exc())
-            return f"🚨 Error en la conexión con Gemini: {str(e)}"
+            return f"ðŸš¨ Error en la conexiÃ³n con Gemini: {str(e)}"
         except Exception as e:
             if self.debug_mode:
                 print(f"Error inesperado con Gemini: {str(e)}")
                 print(traceback.format_exc())
-            return f"🚨 Error inesperado con Gemini: {str(e)}"
+            return f"ðŸš¨ Error inesperado con Gemini: {str(e)}"
